@@ -13,18 +13,15 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddDbContextFactory<OMAContext>(options =>
 {
-    options.UseInMemoryDatabase("In Memory");
-}
-
-
-);
+    options.UseSqlite(builder.Configuration["ConnectionStrings:DefaultConnection"]);
+});
 builder.Services.AddScoped<ICustomerService, CustomerService>();
 builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddGraphQLServer().AddQueryType<Query>().AddFiltering();
-builder.Services.AddCors(options => 
+builder.Services.AddCors(options =>
 {
     options.AddPolicy(name: AllowSpecificOrigins,
-        policy => 
+        policy =>
         {
             policy.AllowAnyOrigin()
                 .AllowAnyHeader()
@@ -38,4 +35,20 @@ app.UseCors(AllowSpecificOrigins);
 
 app.MapGraphQL();
 app.UseGraphQLVoyager("/omar-voyager", new VoyagerOptions { GraphQLEndPoint = "/graphql" });
+
+
+// Migrate Database
+try
+{
+    var scope = app.Services.CreateScope();
+    var context = scope.ServiceProvider.GetRequiredService<OMAContext>();
+    context.Database.Migrate();
+}
+catch (Exception ex)
+{
+    var logger = app.Services.GetRequiredService<ILogger<Program>>();
+    logger.LogError(ex, "An error occured during migration");
+}
+
+
 app.Run();
